@@ -2,6 +2,7 @@
 using HeyGen.Data;
 using HeyGen.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,9 +23,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddHttpClient<IHeyGenService, HeyGenService>(client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["HeyGen:BaseUrl"] ?? "https://api.heygen.com/v2");
-    client.DefaultRequestHeaders.Add("x-api-key", builder.Configuration["HeyGen:ApiKey"]);
+    var baseUrl = builder.Configuration["HeyGen:BaseUrl"];
+    var apiKey = builder.Configuration["HeyGen:ApiKey"];
+
+    client.BaseAddress = new Uri(baseUrl);
+    client.DefaultRequestHeaders.Authorization =
+        new AuthenticationHeaderValue("Bearer", apiKey);
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline

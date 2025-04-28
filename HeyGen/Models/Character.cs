@@ -3,6 +3,6 @@
     public class Character
     {
         public string Type { get; set; } = "text";
-        public string AvaterId { get; set; }
+        public string AvatarId { get; set; }
     }
 }

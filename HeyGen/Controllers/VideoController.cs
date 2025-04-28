@@ -38,7 +38,7 @@ namespace HeyGen.Controllers
                         return BadRequest("Character settings are required");
                     }
 
-                    if (string.IsNullOrEmpty(input.Character.AvaterId))
+                    if (string.IsNullOrEmpty(input.Character.AvatarId))
                     {
                         return BadRequest("Avatar ID is required");
                     }
@@ -75,14 +75,19 @@ namespace HeyGen.Controllers
         {
             try
             {
-                _logger.LogInformation("Received request to list all avatars");
                 var response = await _heyGenService.GetAvatarsAsync();
                 return Ok(response);
             }
+            catch (HttpRequestException httpEx)
+            {
+                _logger.LogError(httpEx, "HTTP Error: {StatusCode} - {Message}",
+                    httpEx.StatusCode, httpEx.Message);
+                return StatusCode(500, $"API Error: {httpEx.Message}");
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing avatars list request");
-                return StatusCode(500, "An error occurred while processing your request");
+                _logger.LogError(ex, "Unexpected error fetching avatars");
+                return StatusCode(500, "Internal server error");
             }
         }
 

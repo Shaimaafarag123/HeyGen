@@ -25,38 +25,40 @@ namespace HeyGen.Services
             _logger = logger;
         }
 
+        private string GetApiKey() => _configuration["HeyGen:ApiKey"];
+        private string GetBaseUrl() => _configuration["HeyGen:BaseUrl"];
+
         public async Task<HeyGenVideoResponse> CreateVideoAsync(HeyGenVideoRequest request)
         {
             try
             {
-                string apiKey = _configuration["HeyGen:ApiKey"];
-                string baseUrl = _configuration["HeyGen:BaseUrl"];
-                string apiUrl = $"{baseUrl}/v2/video/generate";
+                string apiUrl = $"{GetBaseUrl()}/v2/video/generate";
+
                 var jsonOptions = new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                     DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
                 };
+
                 string jsonRequest = JsonSerializer.Serialize(request, jsonOptions);
                 var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
-                // Set up the HTTP request
                 var httpRequest = new HttpRequestMessage(HttpMethod.Post, apiUrl);
-                httpRequest.Headers.Add("x-api-key", apiKey);
+                httpRequest.Headers.Add("x-api-key", GetApiKey());
                 httpRequest.Content = content;
+
                 _logger.LogInformation("Sending request to HeyGen API: {Request}", jsonRequest);
                 var response = await _httpClient.SendAsync(httpRequest);
 
-                // Ensure successful response
                 response.EnsureSuccessStatusCode();
 
-                // Read and deserialize the response
                 var responseContent = await response.Content.ReadAsStringAsync();
                 _logger.LogInformation("Received response from HeyGen API: {ResponseContent}", responseContent);
+
                 var heyGenResponse = JsonSerializer.Deserialize<HeyGenVideoResponse>(responseContent, jsonOptions);
 
-                //store request and response in database 
                 await StoreVideoRequestAsync(request, heyGenResponse, jsonRequest);
+
                 return heyGenResponse;
             }
             catch (Exception ex)
@@ -72,7 +74,7 @@ namespace HeyGen.Services
             {
                 var videoRequestEntity = new VideoRequestEntity
                 {
-                    HeyGenVideoId = response.VideoId,
+                    HeyGenVideoId = response?.VideoId ?? string.Empty,
                     Title = request.Title ?? "Untitled",
                     Caption = request.Caption,
                     Width = request.Dimension?.Width ?? 0,
@@ -93,33 +95,47 @@ namespace HeyGen.Services
         {
             try
             {
-                string apiKey = _configuration["HeyGen:ApiKey"];
-                string baseUrl = _configuration["HeyGen:BaseUrl"];
-                string apiUrl = $"{baseUrl}/v2/avatars";
+                string apiUrl = $"{GetBaseUrl()}/v2/avatars";
 
-                //set up the HTTP request
                 var httpRequest = new HttpRequestMessage(HttpMethod.Get, apiUrl);
-                httpRequest.Headers.Add("x-api-key", apiKey);
+                httpRequest.Headers.Add("x-api-key", GetApiKey());
 
-                _logger.LogInformation("Sending request to HeyGen API: {Request}");
+                _logger.LogInformation("Sending request to HeyGen API to fetch avatars");
+
                 var response = await _httpClient.SendAsync(httpRequest);
 
-                // Ensure successful response
-                response.EnsureSuccessStatusCode();
-
-                // Read and deserialize the response
-                var responseContent = await response.Content.ReadAsStringAsync();
-                _logger.LogInformation("Received response from HeyGen API: {ResponseContent}");
-
-                var jsonOptions = new JsonSerializerOptions
+                if (!response.IsSuccessStatusCode)
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    PropertyNameCaseInsensitive = true
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Failed to fetch avatars from HeyGen API. Status: {StatusCode}, Content: {Content}", response.StatusCode, errorContent);
+                    response.EnsureSuccessStatusCode(); 
+                }
+
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("Received response from HeyGen API: {ResponseContent}", responseContent);
+
+                using JsonDocument doc = JsonDocument.Parse(responseContent);
+                JsonElement root = doc.RootElement;
+
+                var avatars = new List<Avatar>();
+                // object
+                //loop avaters ...> read avaterId ,name, geneder
+                //assign AvaterResponse (Avatars) which has  (AvatarId, AvatarName,  Gender )
+                foreach (var avatarJson in root.GetProperty("data").GetProperty("avatars").EnumerateArray())
+                {
+                    var avatar = new Avatar
+                    {
+                        AvatarId = avatarJson.GetProperty("avatar_id").GetString(),
+                        AvatarName = avatarJson.GetProperty("avatar_name").GetString(),
+                        Gender = avatarJson.GetProperty("gender").GetString()
+                    };
+                    avatars.Add(avatar);
+                }
+
+                return new AvatarsResponse
+                {
+                    Avatars = avatars
                 };
-
-                var avatarsResponse = JsonSerializer.Deserialize<AvatarsResponse>(responseContent, jsonOptions);
-
-                return avatarsResponse;
             }
             catch (Exception ex)
             {
@@ -128,35 +144,46 @@ namespace HeyGen.Services
             }
         }
 
+
+
+
+
         public async Task<VoicesResponse> GetVoicesAsync()
         {
             try
             {
-                string apiKey = _configuration["HeyGen:ApiKey"];
-                string baseUrl = _configuration["HeyGen:BaseUrl"];
-                string apiUrl = $"{baseUrl}/v2/voices";
+                string apiUrl = $"{GetBaseUrl()}/v2/voices";
 
-                // Set up the HTTP request
                 var httpRequest = new HttpRequestMessage(HttpMethod.Get, apiUrl);
-                httpRequest.Headers.Add("x-api-key", apiKey);
+                httpRequest.Headers.Add("x-api-key", GetApiKey());
+
                 _logger.LogInformation("Sending request to HeyGen API to fetch voices");
                 var response = await _httpClient.SendAsync(httpRequest);
 
-                // Ensure successful response
                 response.EnsureSuccessStatusCode();
 
-                // Read and deserialize the response
                 var responseContent = await response.Content.ReadAsStringAsync();
-                _logger.LogInformation("Received voices response from HeyGen API");
+                _logger.LogInformation("Received voices response from HeyGen API: {ResponseContent}", responseContent);
 
-                var jsonOptions = new JsonSerializerOptions
+                using JsonDocument doc = JsonDocument.Parse(responseContent);
+                JsonElement root = doc.RootElement;
+
+                var voices = new List<Voice>();
+                foreach (var voiceJson in root.GetProperty("data").GetProperty("voices").EnumerateArray())
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    PropertyNameCaseInsensitive = true
-                };
+                    var voice = new Voice
+                    {
+                        VoiceId = voiceJson.GetProperty("voice_id").GetString(),
+                        Language = voiceJson.GetProperty("language").GetString(),
+                        Gender = voiceJson.GetProperty("gender").GetString()
+                    };
+                    voices.Add(voice);
+                }
 
-                var voicesResponse = JsonSerializer.Deserialize<VoicesResponse>(responseContent, jsonOptions);
-                return voicesResponse;
+                return new VoicesResponse
+                {
+                    Voices = voices
+                };
             }
             catch (Exception ex)
             {

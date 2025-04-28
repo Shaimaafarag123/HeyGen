@@ -21,7 +21,6 @@ namespace HeyGen.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.HeyGenVideoId).IsRequired();
                 entity.Property(e => e.Title).HasMaxLength(255);
-                entity.Property(e => e.CallBackId).HasMaxLength(255);
                 entity.Property(e => e.JsonRequest).HasColumnType("ntext");
                 entity.Property(e => e.CreatedAt).HasColumnType("datetime2");
             });
