@@ -24,7 +24,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddHttpClient<IHeyGenService, HeyGenService>(client =>
 {
     var baseUrl = builder.Configuration["HeyGen:BaseUrl"];
-    var apiKey = builder.Configuration["HeyGen:ApiKey"];
+    var apiKey = builder.Configuration["HeyGen:ApiKe="];
 
     client.BaseAddress = new Uri(baseUrl);
     client.DefaultRequestHeaders.Authorization =

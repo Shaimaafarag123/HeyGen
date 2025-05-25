@@ -14,6 +14,8 @@ namespace HeyGen.Data
         public DbSet<Avatar> Avatars { get; set; }
         public DbSet<Voice> Voices { get; set; }
 
+        public DbSet<TextToSpeechEntity> TextToSpeechRequests { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<VideoRequestEntity>(entity =>
@@ -36,6 +38,16 @@ namespace HeyGen.Data
                 entity.HasKey(e => e.VoiceId);
                 entity.Property(e => e.Language).HasMaxLength(100);
                 entity.Property(e => e.Gender).HasMaxLength(50);
+            });
+            modelBuilder.Entity<TextToSpeechEntity>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TaskId).IsRequired();
+                entity.Property(e => e.Text).HasColumnType("nvarchar(max)");
+                entity.Property(e => e.VoiceId).IsRequired();
+                entity.Property(e => e.Status).HasMaxLength(50);
+                entity.Property(e => e.AudioUrl).HasMaxLength(1000);
+                entity.Property(e => e.CreatedAt).HasColumnType("datetime2");
             });
         }
     }
